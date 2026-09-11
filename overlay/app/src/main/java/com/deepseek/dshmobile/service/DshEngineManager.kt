@@ -72,7 +72,8 @@ class DshEngineManager(private val context: Context) {
                 .start()
 
             process = pb
-            Log.i(TAG, "Engine process started: PID=${pb.pid()}")
+            // 注意：java.lang.Process.pid() 在 Android 平台上不可用
+            Log.i(TAG, "Engine process started (hash=${pb.hashCode()})")
 
             withContext(Dispatchers.IO) { waitForReady() }
             true
@@ -127,7 +128,7 @@ class DshEngineManager(private val context: Context) {
     fun stop() {
         process?.let {
             it.destroy()
-            Log.i(TAG, "Engine process destroyed: PID=${it.pid()}")
+            Log.i(TAG, "Engine process destroyed (hash=${it.hashCode()})")
         }
         process = null
         isRunning = false
@@ -151,7 +152,8 @@ class DshEngineManager(private val context: Context) {
     /** 发送消息到引擎。 */
     suspend fun sendMessage(content: String, sessionId: String? = null): String =
         withContext(Dispatchers.IO) {
-            val conn = URL("$baseUrl()/api/chat").openConnection() as HttpURLConnection
+            val url = "${baseUrl()}/api/chat"
+            val conn = URL(url).openConnection() as HttpURLConnection
             try {
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
