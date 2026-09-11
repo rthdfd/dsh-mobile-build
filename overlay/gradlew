@@ -1,0 +1,40 @@
+#!/bin/sh
+# 自举式 gradlew：上游仓库没有提交 gradle-wrapper.jar，
+# 而 CI 从 raw.githubusercontent 拉到的 jar 是坏的（"Could not find or load main class
+# org.gradle.wrapper.GradleWrapperMain"）。这里直接下载官方 Gradle 发行包并转发参数。
+set -eu
+
+GRADLE_VERSION="${DSH_GRADLE_VERSION:-8.9}"
+GRADLE_HOME_DIR="${HOME:-/root}/gradle-${GRADLE_VERSION}"
+GRADLE_BIN="${GRADLE_HOME_DIR}/bin/gradle"
+DIST_URL="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+
+if [ ! -x "$GRADLE_BIN" ]; then
+  echo "[gradlew] Bootstrapping Gradle ${GRADLE_VERSION} from ${DIST_URL}"
+  ZIP="${TMPDIR:-/tmp}/gradle-${GRADLE_VERSION}-bin.zip"
+  for attempt in 1 2 3; do
+    if curl -fSL --retry 3 --connect-timeout 20 -o "$ZIP" "$DIST_URL"; then
+      break
+    fi
+    echo "[gradlew] download attempt ${attempt} failed, retrying..."
+    sleep 5
+  done
+  if [ ! -s "$ZIP" ]; then
+    echo "[gradlew] FATAL: could not download Gradle distribution" >&2
+    exit 1
+  fi
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -q -o "$ZIP" -d "${HOME:-/root}"
+  else
+    python3 -c "import sys,zipfile;zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$ZIP" "${HOME:-/root}"
+  fi
+  rm -f "$ZIP"
+fi
+
+if [ ! -x "$GRADLE_BIN" ]; then
+  echo "[gradlew] FATAL: gradle binary missing at $GRADLE_BIN" >&2
+  exit 1
+fi
+
+echo "[gradlew] Using $("$GRADLE_BIN" --version 2>&1 | head -n 5 || true)"
+exec "$GRADLE_BIN" "$@"
