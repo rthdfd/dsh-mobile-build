@@ -12,6 +12,7 @@ room = "2.6.1"
 datastrore = "1.1.1"
 coroutines = "1.8.1"
 hilt = "2.52"
+hiltNavigationCompose = "1.2.0"
 googleMaterial = "1.12.0"
 
 [libraries]
@@ -37,6 +38,7 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 google-material = { group = "com.google.android.material", name = "material", version.ref = "googleMaterial" }
 
 [plugins]
