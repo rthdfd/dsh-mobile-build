@@ -1,7 +1,9 @@
 [versions]
 agp = "8.5.2"
 kotlin = "2.0.21"
-coreKtx = "1.15.0"
+# core-ktx 1.15.0 要求 compileSdk 35，而 CI 只装了 android-34 平台（AGP 8.5.2 上限也是 34），
+# 因此锁到 1.13.1（compileSdk 34 可用）。
+coreKtx = "1.13.1"
 appcompat = "1.7.0"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
