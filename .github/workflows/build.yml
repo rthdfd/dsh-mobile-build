@@ -1,0 +1,103 @@
+name: Build DSH Mobile APK
+
+# 该仓库不存放源码：每次运行都会从上游 Thanksgiver233/dsh-mobile 拉取最新源码，
+# 覆盖 overlay/ 下的构建修复文件，然后用 Android SDK 34 + JDK 17 编译 debug APK。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: Fetch upstream dsh-mobile source
+        run: |
+          set -eux
+          mkdir -p upstream
+          curl -fsSL -o upstream.tar.gz https://codeload.github.com/Thanksgiver233/dsh-mobile/tar.gz/refs/heads/main
+          tar -xzf upstream.tar.gz -C upstream --strip-components=1
+          echo "--- upstream tree ---"
+          find upstream -maxdepth 2 -type d | sort
+
+      - name: Apply build fixes (overlay)
+        run: |
+          set -eux
+          rm -rf build
+          cp -a upstream build
+          cp -a overlay/. build/
+          echo "--- patched app/build.gradle.kts head ---"
+          head -n 8 build/app/build.gradle.kts
+          echo "--- gradle.properties ---"
+          cat build/gradle.properties
+          echo "--- overlay files applied ---"
+          find build/app/src/main/java/com/deepseek/dshmobile -name "*.kt" | sort
+
+      - name: Add Gradle wrapper jar
+        run: |
+          set -eux
+          curl -fsSL -o build/gradle/wrapper/gradle-wrapper.jar \
+            https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar
+          ls -la build/gradle/wrapper/
+
+      - name: Build debug APK
+        working-directory: build
+        run: |
+          chmod +x gradlew
+          set +e
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace > ../build.log 2>&1
+          code=$?
+          echo "gradle exit code: $code"
+          tail -n 80 ../build.log
+          if [ $code -ne 0 ]; then
+            echo "===================== DIAGNOSTICS ====================="
+            grep -n -E "^e: |error:|error;|FAILURE:|What went wrong|Caused by|> Task .* FAILED" ../build.log | head -n 120
+            exit 1
+          fi
+
+      - name: Collect APK
+        if: always()
+        run: |
+          mkdir -p dist
+          find build -name "*.apk" -type f -print || true
+          cp build/app/build/outputs/apk/debug/*.apk dist/ 2>/dev/null || true
+          ls -la dist || true
+
+      - name: Upload APK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-mobile-debug-apk
+          path: dist/*.apk
+          if-no-files-found: warn
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: warn
